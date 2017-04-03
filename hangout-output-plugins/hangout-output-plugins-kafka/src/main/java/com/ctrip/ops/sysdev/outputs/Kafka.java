@@ -10,11 +10,13 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
 import lombok.extern.log4j.Log4j;
+import org.apache.log4j.Logger;
 import org.json.simple.JSONValue;
 
 @Log4j
 public class Kafka extends BaseOutput {
-
+    private static final Logger log = Logger.getLogger(Kafka.class
+            .getName());
     private Producer producer;
     private String topic;
     private Properties props;

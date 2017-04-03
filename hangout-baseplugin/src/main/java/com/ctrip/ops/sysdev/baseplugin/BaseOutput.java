@@ -1,17 +1,19 @@
 package com.ctrip.ops.sysdev.baseplugin;
 
+import com.ctrip.ops.sysdev.render.FreeMarkerRender;
+import com.ctrip.ops.sysdev.render.TemplateRender;
+import lombok.extern.log4j.Log4j;
+import org.apache.log4j.Logger;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import com.ctrip.ops.sysdev.exception.YamlConfigException;
-import lombok.extern.log4j.Log4j;
-import com.ctrip.ops.sysdev.render.FreeMarkerRender;
-import com.ctrip.ops.sysdev.render.TemplateRender;
-
 @Log4j
 public abstract class BaseOutput extends Base {
+    private static final Logger log = Logger.getLogger(BaseOutput.class
+            .getName());
     protected Map config;
     protected List<TemplateRender> IF;
 

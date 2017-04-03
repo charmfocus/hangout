@@ -6,6 +6,7 @@ import com.ctrip.ops.sysdev.render.FreeMarkerRender;
 import com.ctrip.ops.sysdev.render.RenderUtils;
 import com.ctrip.ops.sysdev.render.TemplateRender;
 import lombok.extern.log4j.Log4j;
+import org.apache.log4j.Logger;
 import org.elasticsearch.action.ActionRequest;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkProcessor;
@@ -29,6 +30,8 @@ import java.util.concurrent.TimeUnit;
 
 @Log4j
 public class Elasticsearch extends BaseOutput {
+    private static final Logger log = Logger.getLogger(Elasticsearch.class
+            .getName());
 
     private final static int BULKACTION = 20000;
     private final static int BULKSIZE = 15; //MB
@@ -114,7 +117,7 @@ public class Elasticsearch extends BaseOutput {
                     public void afterBulk(long executionId, BulkRequest request,
                                           BulkResponse response) {
                         log.info("bulk done with executionId: " + executionId);
-                        List<ActionRequest<?>> requests = request.requests();
+                        List<ActionRequest> requests = request.requests();
                         int toBeTry = 0;
                         int totalFailed = 0;
                         for (BulkItemResponse item : response.getItems()) {
