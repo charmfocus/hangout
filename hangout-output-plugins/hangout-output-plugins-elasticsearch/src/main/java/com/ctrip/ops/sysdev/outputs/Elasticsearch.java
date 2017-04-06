@@ -20,6 +20,7 @@ import org.elasticsearch.common.unit.ByteSizeUnit;
 import org.elasticsearch.common.unit.ByteSizeValue;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.transport.client.PreBuiltTransportClient;
+import org.json.simple.JSONObject;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -136,6 +137,8 @@ public class Elasticsearch extends BaseOutput {
                                         if (totalFailed == 0) {
                                             log.error("bulk has failed item which do NOT need to retry");
                                             log.error(item.getFailureMessage());
+                                            IndexRequest indexRequest = (IndexRequest) requests.get(item.getItemId());
+                                            log.error(JSONObject.toJSONString(indexRequest.sourceAsMap()));
                                         }
                                         break;
                                 }
