@@ -4,10 +4,10 @@ import com.ctrip.ops.sysdev.baseplugin.BaseOutput;
 import com.ctrip.ops.sysdev.render.DateFormatter;
 import com.ctrip.ops.sysdev.render.TemplateRender;
 import lombok.extern.log4j.Log4j2;
+import org.apache.log4j.Logger;
 import org.apache.http.HttpHost;
 import org.apache.http.entity.ContentType;
 import org.apache.http.nio.entity.NStringEntity;
-import org.apache.log4j.Logger;
 import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.sniff.Sniffer;
@@ -25,7 +25,6 @@ import static java.util.stream.Collectors.toList;
 public class ElasticsearchHTTP extends BaseOutput {
     private static final Logger log = Logger.getLogger(ElasticsearchHTTP.class
             .getName());
-
     private final static int BULKACTION = 20000;
 
     private String index;

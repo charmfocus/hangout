@@ -4,6 +4,7 @@ import com.ctrip.ops.sysdev.baseplugin.BaseOutput;
 import com.ctrip.ops.sysdev.render.DateFormatter;
 import com.ctrip.ops.sysdev.render.TemplateRender;
 import lombok.extern.log4j.Log4j2;
+import org.apache.log4j.Logger;
 import org.elasticsearch.action.DocWriteRequest;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkProcessor;
@@ -29,6 +30,8 @@ import java.util.concurrent.TimeUnit;
 
 @Log4j2
 public class Elasticsearch extends BaseOutput {
+    private static final Logger log = Logger.getLogger(Elasticsearch.class
+            .getName());
     private final static int BULKACTION = 20000;
     private final static int BULKSIZE = 15; //MB
     private final static int FLUSHINTERVAL = 10;

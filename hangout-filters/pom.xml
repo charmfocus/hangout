@@ -33,6 +33,7 @@
         <module>hangout-filters-urldecode</module>
         <module>hangout-filters-metric</module>
         <module>hangout-filters-flatmetric</module>
+        <module>hangout-filters-ipip</module>
     </modules>
 
 

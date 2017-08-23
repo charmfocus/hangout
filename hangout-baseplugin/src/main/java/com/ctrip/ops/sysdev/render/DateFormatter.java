@@ -1,18 +1,16 @@
 package com.ctrip.ops.sysdev.render;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import org.apache.log4j.Logger;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
-import org.json.simple.JSONObject;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class DateFormatter {
 	private static final Logger log = Logger.getLogger(DateFormatter.class
@@ -60,13 +58,13 @@ public class DateFormatter {
 				if (event.containsKey(keys[0])) {
 					Object _val = event.get(keys[0]);
 					for (int i = 1; i < keys.length; ++i) {
-                        if (!(_val instanceof HashMap)) {
-                            break;
+						if (!(_val instanceof HashMap)) {
+							break;
 						}
 						_val = ((Map)_val).get(keys[i]);
 					}
 
-                    m.appendReplacement(sb, String.valueOf(_val));
+					m.appendReplacement(sb, String.valueOf(_val));
 				}
 
 			}
