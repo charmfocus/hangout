@@ -2,12 +2,9 @@ package com.ctrip.ops.sysdev.outputs;
 
 import com.ctrip.ops.sysdev.baseplugin.BaseOutput;
 import com.ctrip.ops.sysdev.render.DateFormatter;
-import com.ctrip.ops.sysdev.render.FreeMarkerRender;
-import com.ctrip.ops.sysdev.render.RenderUtils;
 import com.ctrip.ops.sysdev.render.TemplateRender;
-import lombok.extern.log4j.Log4j;
-import org.apache.log4j.Logger;
-import org.elasticsearch.action.ActionRequest;
+import lombok.extern.log4j.Log4j2;
+import org.elasticsearch.action.DocWriteRequest;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkProcessor;
 import org.elasticsearch.action.bulk.BulkRequest;
@@ -20,20 +17,18 @@ import org.elasticsearch.common.unit.ByteSizeUnit;
 import org.elasticsearch.common.unit.ByteSizeValue;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.transport.client.PreBuiltTransportClient;
-import org.json.simple.JSONObject;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-@Log4j
+@Log4j2
 public class Elasticsearch extends BaseOutput {
-    private static final Logger log = Logger.getLogger(Elasticsearch.class
-            .getName());
-
     private final static int BULKACTION = 20000;
     private final static int BULKSIZE = 15; //MB
     private final static int FLUSHINTERVAL = 10;
@@ -48,6 +43,7 @@ public class Elasticsearch extends BaseOutput {
     private TemplateRender indexTypeRender;
     private TemplateRender idRender;
     private TemplateRender parentRender;
+    private TemplateRender routeRender;
 
     public Elasticsearch(Map config) {
         super(config);
@@ -62,15 +58,54 @@ public class Elasticsearch extends BaseOutput {
             this.indexTimezone = "UTC";
         }
 
+        if (config.containsKey("document_id")) {
+            String document_id = config.get("document_id").toString();
+            try {
+                this.idRender = TemplateRender.getRender(document_id);
+            } catch (IOException e) {
+                log.fatal("could not build tempalte from " + document_id);
+                System.exit(1);
+            }
+        } else {
+            this.idRender = null;
+        }
+
+        String index_type = "logs";
+        if (config.containsKey("index_type")) {
+            index_type = config.get("index_type").toString();
+        }
         try {
-            this.idRender = RenderUtils.esConfigRender(config, "document_id", null);
-            this.parentRender = RenderUtils.esConfigRender(config, "document_parent", null);
-            this.indexTypeRender = RenderUtils.esConfigRender(config, "index_type", new FreeMarkerRender("logs", "logs"));
-            this.initESClient();
-        } catch (Exception e) {
-            log.error(e);
+            this.indexTypeRender = TemplateRender.getRender(index_type);
+        } catch (IOException e) {
+            log.fatal("could not build tempalte from " + index_type);
             System.exit(1);
         }
+
+        if (config.containsKey("document_parent")) {
+            String document_parent = config.get("document_parent").toString();
+            try {
+                this.parentRender = TemplateRender.getRender(document_parent);
+            } catch (IOException e) {
+                log.fatal("could not build tempalte from " + document_parent);
+                System.exit(1);
+            }
+        } else {
+            this.parentRender = null;
+        }
+
+        if (config.containsKey("route")) {
+            String route = config.get("route").toString();
+            try {
+                this.routeRender = TemplateRender.getRender(route);
+            } catch (IOException e) {
+                log.fatal("could not build tempalte from " + route);
+                System.exit(1);
+            }
+        } else {
+            this.routeRender = null;
+        }
+
+        this.initESClient();
     }
 
     private void initESClient() throws NumberFormatException {
@@ -80,12 +115,17 @@ public class Elasticsearch extends BaseOutput {
         boolean sniff = config.containsKey("sniff") ? (boolean) config.get("sniff") : DEFAULTSNIFF;
         boolean compress = config.containsKey("compress") ? (boolean) config.get("compress") : DEFAULTCOMPRESS;
 
-        Settings settings = Settings.builder()
+        Settings.Builder settings = Settings.builder()
                 .put("client.transport.sniff", sniff)
                 .put("transport.tcp.compress", compress)
-                .put("cluster.name", clusterName).build();
+                .put("cluster.name", clusterName);
 
-        esclient = new PreBuiltTransportClient(settings);
+
+        if (config.containsKey("settings")) {
+            HashMap<String, Object> otherSettings = (HashMap<String, Object>) this.config.get("settings");
+            otherSettings.entrySet().stream().forEach(entry -> settings.put(entry.getKey(), entry.getValue()));
+        }
+        esclient = new PreBuiltTransportClient(settings.build());
 
         ArrayList<String> hosts = (ArrayList<String>) config.get("hosts");
         hosts.stream().map(host -> host.split(":")).forEach(parsedHost -> {
@@ -99,7 +139,7 @@ public class Elasticsearch extends BaseOutput {
             }
         });
 
-        int bulkActions = config.containsKey("bulk_action") ? (int) config.get("bulk_action") : BULKACTION;
+        int bulkActions = config.containsKey("bulk_actions") ? (int) config.get("bulk_actions") : BULKACTION;
         int bulkSize = config.containsKey("bulk_size") ? (int) config.get("bulk_size") : BULKSIZE;
         int flushInterval = config.containsKey("flush_interval") ? (int) config.get("flush_interval") : FLUSHINTERVAL;
         int concurrentRequests = config.containsKey("concurrent_requests") ? (int) config.get("concurrent_requests") : CONCURRENTREQSIZE;
@@ -118,7 +158,7 @@ public class Elasticsearch extends BaseOutput {
                     public void afterBulk(long executionId, BulkRequest request,
                                           BulkResponse response) {
                         log.info("bulk done with executionId: " + executionId);
-                        List<ActionRequest> requests = request.requests();
+                        List<DocWriteRequest> requests = request.requests();
                         int toBeTry = 0;
                         int totalFailed = 0;
                         for (BulkItemResponse item : response.getItems()) {
@@ -137,8 +177,6 @@ public class Elasticsearch extends BaseOutput {
                                         if (totalFailed == 0) {
                                             log.error("bulk has failed item which do NOT need to retry");
                                             log.error(item.getFailureMessage());
-                                            IndexRequest indexRequest = (IndexRequest) requests.get(item.getItemId());
-                                            log.error(JSONObject.toJSONString(indexRequest.sourceAsMap()));
                                         }
                                         break;
                                 }
@@ -155,11 +193,11 @@ public class Elasticsearch extends BaseOutput {
 
                         if (toBeTry > 0) {
                             try {
-                                log.info("sleep " + toBeTry / 2
-                                        + "millseconds after bulk failure");
                                 Thread.sleep(toBeTry / 2);
+                                log.info("slept " + toBeTry / 2
+                                        + "millseconds after bulk failure");
                             } catch (InterruptedException e) {
-                                log.error(e);
+                                log.debug(e);
                             }
                         } else {
                             log.debug("no docs need to retry");
@@ -190,6 +228,9 @@ public class Elasticsearch extends BaseOutput {
         if (this.parentRender != null) {
             indexRequest.parent(parentRender.render(event).toString());
         }
+        if (this.routeRender != null) {
+            indexRequest.routing(this.routeRender.render(event).toString());
+        }
         this.bulkProcessor.add(indexRequest);
     }
 
@@ -199,7 +240,7 @@ public class Elasticsearch extends BaseOutput {
         //flush immediately
         this.bulkProcessor.flush();
 
-        // await for some time for rest data from kafka
+        // await for some time for rest data from input
         int flushInterval = 10;
         if (config.containsKey("flush_interval")) {
             flushInterval = (int) config.get("flush_interval");
@@ -207,8 +248,8 @@ public class Elasticsearch extends BaseOutput {
         try {
             this.bulkProcessor.awaitClose(flushInterval, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
-            log.error("failed to bulk docs before shutdown");
-            log.error(e);
+            log.info("failed to bulk docs before shutdown");
+            log.debug(e);
         }
     }
 }

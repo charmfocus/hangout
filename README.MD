@@ -41,16 +41,9 @@ This product includes GeoLite2 data created by MaxMind, available from
 # 运行
 	bin/hangout -f app.yml
 
-记录日志到文件:
+日志库使用的[log4j2](https://logging.apache.org/log4j/2.x/). 默认的配置文件就是Hangout目录下的log4j2.xml  
+默认日志记录是info级别, 环境变量HO_LOG_LEVEL可以更改日志级别. `export HO_LOG_LEVEL=error`更改到error
 
-	bin/hangout -f app.yml -l /var/log/hangout/app.yml.log
-
-默认日志记录是warn级别, 详细日志:
-
-	bin/hangout -f app.yml -l /var/log/hangout/app.yml.log -vvvv
-
--v 是info , -vv 是debug , -vvvv 是Trace
-		
 
 # 配置
 配置在一定程度上也是模仿logstash, 但用的是通用的yaml格式.
@@ -76,7 +69,6 @@ This product includes GeoLite2 data created by MaxMind, available from
           auto.commit.interval.ms: "1000"
           socket.receive.buffer.bytes: "1048576"
           fetch.message.max.bytes: "1048576"
-          num.consumer.fetchers: "4"
         codec: plain
 
 支持白名单匹配，使用topic_pattern指定正则表达式来匹配topic名称，如果指定此参数，topic参数会被忽略。
@@ -253,7 +245,7 @@ sniff设置为true的话, 会把hosts当做一个入口, 然后去寻找真正�
 	hosts: # required
 		- 192.168.1.100
 		- 192.168.1.200:9301
-	index: 'hangout-${@timestamp.toString("YYYY.MM.dd")}'
+	index: 'hangout-%{+YYYY.MM.dd}'
 	index_type: logs # default logs
 	bulk_actions: 20000 # default 20000
 	bulk_size: 15	#default 15
@@ -283,20 +275,35 @@ sniff设置为true的话, 会把hosts当做一个入口, 然后去寻找真正�
 主要测试用吧. 因为配置是yml格式, 所以没有其它条件的话, 需要写成 
 
     - Stdout: {}
-    
-## Admin
-为了实现hangout分布式部署中对各个agent的统一性能和运行情况监控，实现了一个具备restful api的Admin server，具体配置为
-    
-    commons:
-          admin_listen: true
-          admin_ip: 192.168.145.128
-          admin_port: 8080
 
-admin_listen为是否开启admin server
-admin_ip为绑定IP,默认为0.0.0.0(绑定所有IP)
-admin_port为监听端口，默认8080
+## Metrics
+为了实现对各个agent的统一性能和运行情况监控，在input/filter/output之外又提供了种叫Metrics的plugin, 用来监控应用的指标, 目前(0.3.0)提供了两种插件, 一种写一些性能数据到Graphit, 一种是restful接口提供性能监控、探活.
 
-提供功能为性能监控、探活。如果需要使用，可以参考stdin-input和stdout-output里面的计数方法。
+```
+metrics:
+    - Graphit:
+        port: 2004  # graphit port
+        host: 10.0.0.100  # graphit host
+        prefix: hangout
+        metrics:
+            com.codahale.metrics.JvmAttributeGaugeSet: [] # empty list will register all metrics in it
+            com.codahale.metrics.jvm.MemoryUsageGaugeSet: []
+            com.codahale.metrics.jvm.ThreadStatesGaugeSet: []
+            com.codahale.metrics.jvm.GarbageCollectorMetricSet: []
+
+    - Watcher:
+        host: 0.0.0.0
+        port: 8080
+```
+
+metric count, 可以记录流经每个plugin的数据多少, 开发新的plugin可以参考stdin-input和stdout-output里面的计数方法. 
+
+在使用的时候需要注意, yml配置文件中需要指明meter_name才可以记录.
+
+```
+- Stdin:
+  meter_name: stdin1
+```
 
 # 开发:
 当然可以在hangout的结构上继续开发, 可以参考项目结构中baseplugin和input,output,filters等插件.  

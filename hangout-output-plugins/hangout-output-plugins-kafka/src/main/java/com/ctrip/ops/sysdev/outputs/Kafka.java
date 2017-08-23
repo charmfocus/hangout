@@ -1,5 +1,6 @@
 package com.ctrip.ops.sysdev.outputs;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -8,18 +9,18 @@ import com.ctrip.ops.sysdev.baseplugin.BaseOutput;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import com.ctrip.ops.sysdev.render.TemplateRender;
 
-import lombok.extern.log4j.Log4j;
-import org.apache.log4j.Logger;
+import lombok.extern.log4j.Log4j2;
 import org.json.simple.JSONValue;
 
-@Log4j
+@Log4j2
 public class Kafka extends BaseOutput {
-    private static final Logger log = Logger.getLogger(Kafka.class
-            .getName());
+
     private Producer producer;
     private String topic;
     private Properties props;
+    private TemplateRender topicRender;
 
     public Kafka(Map config) {
         super(config);
@@ -31,7 +32,12 @@ public class Kafka extends BaseOutput {
             System.exit(1);
         }
         this.topic = (String) this.config.get("topic");
-
+        try {
+            this.topicRender = TemplateRender.getRender(topic);
+        } catch (IOException e) {
+            log.fatal("could not build template from" + topic);
+            System.exit(1);
+        }
         props = new Properties();
 
         HashMap<String, String> producerSettings = (HashMap<String, String>) this.config.get("producer_settings");
@@ -64,7 +70,8 @@ public class Kafka extends BaseOutput {
     }
 
     protected void emit(Map event) {
-        producer.send(new ProducerRecord<String, String>(topic, JSONValue.toJSONString(event)));
+        String _topic = topicRender.render(event).toString();
+        producer.send(new ProducerRecord<String, String>(_topic, JSONValue.toJSONString(event)));
     }
 
     public void shutdown() {
